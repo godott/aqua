@@ -1274,7 +1274,7 @@ class Operator(object):
                 for Z_ctrl in Z_indices[:-1]:
                     qc.cx(state_registers[Z_ctrl], ancillary_registers[ctl_idx])
             
-                qc.cx(ancillary_registers[ctl_idx], state_registers[top_XYZ_pauli_indices[pauli_idx]])
+
                     
                 if inner_cnot_qubit_pairs[pauli_idx] is None:
                     inner_cnot_qubit_pairs[pauli_idx] = list(zip(
@@ -1288,6 +1288,7 @@ class Operator(object):
                 if sorted(X_indices + Y_indices)[-1] != top_XYZ_pauli_indices[pauli_idx]:
                     qc.cx(state_registers[sorted(X_indices + Y_indices)[-1]],  state_registers[top_XYZ_pauli_indices[pauli_idx]])
 
+                qc.cx(ancillary_registers[ctl_idx], state_registers[top_XYZ_pauli_indices[pauli_idx]])
                 # insert Rz gate
 
                 if top_XYZ_pauli_indices[pauli_idx] >= 0:
@@ -1297,13 +1298,14 @@ class Operator(object):
                     else:
                         qc.rz(lam, state_registers[top_XYZ_pauli_indices[pauli_idx]])
 
+                qc.cx(ancillary_registers[ctl_idx], state_registers[top_XYZ_pauli_indices[pauli_idx]])
                 if sorted(X_indices + Y_indices)[-1] != top_XYZ_pauli_indices[pauli_idx]:
                     qc.cx(state_registers[sorted(X_indices + Y_indices)[-1]],  state_registers[top_XYZ_pauli_indices[pauli_idx]])
 
                 for pair in reversed(inner_cnot_qubit_pairs[pauli_idx]):
                     qc.cx(state_registers[pair[0]], state_registers[pair[1]])
 
-                qc.cx(ancillary_registers[ctl_idx], state_registers[top_XYZ_pauli_indices[pauli_idx]])
+
 
                 for Z_ctrl in reversed(Z_indices[:-1]):
                     qc.cx(state_registers[Z_ctrl], ancillary_registers[ctl_idx])
