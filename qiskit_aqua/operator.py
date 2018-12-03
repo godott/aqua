@@ -1151,12 +1151,20 @@ class Operator(object):
 
         # for each pauli [IXYZ]+, record the list of qubit pairs needing CX's
         cnot_qubit_pairs = [None] * len(slice_pauli_list)
+        inner_cnot_qubit_pairs = [None] * len(slice_pauli_list)
         # for each pauli [IXYZ]+, record the highest index of the nontrivial pauli gate (X,Y, or Z)
         top_XYZ_pauli_indices = [-1] * len(slice_pauli_list)
 
         for pauli_idx, pauli in enumerate(reversed(slice_pauli_list)):
+
             # changes bases if necessary
+
             nontrivial_pauli_indices = []
+
+            X_indices = []
+            Y_indices = []
+            Z_indices = []
+
             for qubit_idx in range(n_qubits):
                 # pauli I
                 if pauli[1].v[qubit_idx] == 0 and pauli[1].w[qubit_idx] == 0:
@@ -1168,26 +1176,29 @@ class Operator(object):
                 if pauli[1].w[qubit_idx] == 1:
                     # pauli X
                     if pauli[1].v[qubit_idx] == 0:
+                        X_indices.append(qubit_idx)
                         if use_basis_gates:
                             qc.u2(0.0, pi, state_registers[qubit_idx])
+
                         else:
                             qc.h(state_registers[qubit_idx])
                     # pauli Y
                     elif pauli[1].v[qubit_idx] == 1:
+                        Y_indices.append(qubit_idx)
                         if use_basis_gates:
                             qc.u3(pi / 2, -pi / 2, pi / 2, state_registers[qubit_idx])
                         else:
                             qc.rx(pi / 2, state_registers[qubit_idx])
                 # pauli Z
                 elif pauli[1].v[qubit_idx] == 1 and pauli[1].w[qubit_idx] == 0:
-                    pass
+                    Z_indices.append(qubit_idx)
                 else:
                     raise ValueError('Unrecognized pauli: {}'.format(pauli[1]))
-
-            if len(nontrivial_pauli_indices) > 0:
-                top_XYZ_pauli_indices[pauli_idx] = nontrivial_pauli_indices[-1]
-
+                if len(nontrivial_pauli_indices) > 0:
+                    top_XYZ_pauli_indices[pauli_idx] = nontrivial_pauli_indices[-1]
             # insert lhs cnot gates
+
+            """
             if cnot_qubit_pairs[pauli_idx] is None:
                 cnot_qubit_pairs[pauli_idx] = list(zip(
                     sorted(nontrivial_pauli_indices)[:-1],
@@ -1196,30 +1207,118 @@ class Operator(object):
 
             for pair in cnot_qubit_pairs[pauli_idx]:
                 qc.cx(state_registers[pair[0]], state_registers[pair[1]])
+            """
+            
 
-            # insert Rz gate
-            if top_XYZ_pauli_indices[pauli_idx] >= 0:
-                if ancillary_registers is None:
+            if  ancillary_registers is None: 
+
+                if cnot_qubit_pairs[pauli_idx] is None:
+                    cnot_qubit_pairs[pauli_idx] = list(zip(
+                        sorted(Z_indices)[:-1],
+                        sorted(Z_indices)[1:]
+                     ))
+                
+                for pair in cnot_qubit_pairs[pauli_idx]:
+                    qc.cx(state_registers[pair[0]], state_registers[pair[1]])
+            
+                if sorted(Z_indices)[-1] != top_XYZ_pauli_indices[pauli_idx]:
+                    qc.cx(state_registers[sorted(Z_indices)[-1]],  state_registers[top_XYZ_pauli_indices[pauli_idx]])
+                    
+                if inner_cnot_qubit_pairs[pauli_idx] is None:
+                    inner_cnot_qubit_pairs[pauli_idx] = list(zip(
+                        sorted(X_indices + Y_indices)[:-1],
+                        sorted(X_indices + Y_indices)[1:]
+                     ))
+
+                for pair in inner_cnot_qubit_pairs[pauli_idx]:
+                    qc.cx(state_registers[pair[0]], state_registers[pair[1]])
+
+                if sorted(X_indices + Y_indices)[-1] != top_XYZ_pauli_indices[pauli_idx]:
+                    qc.cx(state_registers[sorted(X_indices + Y_indices)[-1]],  state_registers[top_XYZ_pauli_indices[pauli_idx]])
+
+                # insert Rz gate
+                if top_XYZ_pauli_indices[pauli_idx] >= 0:
                     lam = (2.0 * pauli[0] * evo_time / num_time_slices).real
                     if use_basis_gates:
                         qc.u1(lam, state_registers[top_XYZ_pauli_indices[pauli_idx]])
                     else:
                         qc.rz(lam, state_registers[top_XYZ_pauli_indices[pauli_idx]])
-                else:
-                    unitary_power = (2 ** ctl_idx) if unitary_power is None else unitary_power
-                    lam = (2.0 * pauli[0] * evo_time / num_time_slices * unitary_power).real
-
-                    if use_basis_gates:
-                        qc.u1(lam / 2, state_registers[top_XYZ_pauli_indices[pauli_idx]])
-                        qc.cx(ancillary_registers[ctl_idx], state_registers[top_XYZ_pauli_indices[pauli_idx]])
-                        qc.u1(-lam / 2, state_registers[top_XYZ_pauli_indices[pauli_idx]])
-                        qc.cx(ancillary_registers[ctl_idx], state_registers[top_XYZ_pauli_indices[pauli_idx]])
+                    """
                     else:
-                        qc.crz(lam, ancillary_registers[ctl_idx], state_registers[top_XYZ_pauli_indices[pauli_idx]])
+                        unitary_power = (2 ** ctl_idx) if unitary_power is None else unitary_power
+                        lam = (2.0 * pauli[0] * evo_time / num_time_slices * unitary_power).real
 
+                        if use_basis_gates:
+                            qc.u1(lam / 2, state_registers[top_XYZ_pauli_indices[pauli_idx]])
+                            qc.cx(ancillary_registers[ctl_idx], state_registers[top_XYZ_pauli_indices[pauli_idx]])
+                            qc.u1(-lam / 2, state_registers[top_XYZ_pauli_indices[pauli_idx]])
+                            qc.cx(ancillary_registers[ctl_idx], state_registers[top_XYZ_pauli_indices[pauli_idx]])
+                        else:
+                            qc.crz(lam, ancillary_registers[ctl_idx], state_registers[top_XYZ_pauli_indices[pauli_idx]])
+                    """
+
+                if sorted(X_indices + Y_indices)[-1] != top_XYZ_pauli_indices[pauli_idx]:
+                    qc.cx(state_registers[sorted(X_indices + Y_indices)[-1]],  state_registers[top_XYZ_pauli_indices[pauli_idx]])
+
+                for pair in reversed(inner_cnot_qubit_pairs[pauli_idx]):
+                    qc.cx(state_registers[pair[0]], state_registers[pair[1]])
+
+                if sorted(Z_indices)[-1] != top_XYZ_pauli_indices[pauli_idx]:
+                    qc.cx(state_registers[sorted(Z_indices)[-1]],  state_registers[top_XYZ_pauli_indices[pauli_idx]])
+
+                for pair in reversed(cnot_qubit_pairs[pauli_idx]):
+                    qc.cx(state_registers[pair[0]], state_registers[pair[1]])
+
+            else: 
+
+                for Z_ctrl in Z_indices[:-1]:
+                    qc.cx(state_registers[Z_ctrl], ancillary_registers[ctl_idx])
+            
+                if Z_indices[-1] != top_XYZ_pauli_indices[pauli_idx]:
+                    qc.cx(state_registers[Z_indices[-1]],  ancillary_registers[top_XYZ_pauli_indices[pauli_idx]])
+
+                qc.cx(ancillary_registers[ctl_idx], state_registers[top_XYZ_pauli_indices[pauli_idx]])
+                    
+                if inner_cnot_qubit_pairs[pauli_idx] is None:
+                    inner_cnot_qubit_pairs[pauli_idx] = list(zip(
+                        sorted(X_indices + Y_indices)[:-1],
+                        sorted(X_indices + Y_indices)[1:]
+                     ))
+
+                for pair in inner_cnot_qubit_pairs[pauli_idx]:
+                    qc.cx(state_registers[pair[0]], state_registers[pair[1]])
+
+                if sorted(X_indices + Y_indices)[-1] != top_XYZ_pauli_indices[pauli_idx]:
+                    qc.cx(state_registers[sorted(X_indices + Y_indices)[-1]],  state_registers[top_XYZ_pauli_indices[pauli_idx]])
+
+                # insert Rz gate
+
+                if top_XYZ_pauli_indices[pauli_idx] >= 0:
+                    lam = (2.0 * pauli[0] * evo_time / num_time_slices).real
+                    if use_basis_gates:
+                        qc.u1(lam, state_registers[top_XYZ_pauli_indices[pauli_idx]])
+                    else:
+                        qc.rz(lam, state_registers[top_XYZ_pauli_indices[pauli_idx]])
+
+                if sorted(X_indices + Y_indices)[-1] != top_XYZ_pauli_indices[pauli_idx]:
+                    qc.cx(state_registers[sorted(X_indices + Y_indices)[-1]],  state_registers[top_XYZ_pauli_indices[pauli_idx]])
+
+                for pair in reversed(inner_cnot_qubit_pairs[pauli_idx]):
+                    qc.cx(state_registers[pair[0]], state_registers[pair[1]])
+
+                qc.cx(ancillary_registers[ctl_idx], state_registers[top_XYZ_pauli_indices[pauli_idx]])
+
+                if Z_indices[-1] != top_XYZ_pauli_indices[pauli_idx]:
+                    qc.cx(state_registers[Z_indices[-1]],  ancillary_registers[top_XYZ_pauli_indices[pauli_idx]])
+
+                for Z_ctrl in reversed(Z_indices[:-1]):
+                    qc.cx(state_registers[Z_ctrl], ancillary_registers[ctl_idx])
+
+            """
             # insert rhs cnot gates
-            for pair in reversed(cnot_qubit_pairs[pauli_idx]):
+            for pair in reversed(inner_cnot_qubit_pairs[pauli_idx]):
                 qc.cx(state_registers[pair[0]], state_registers[pair[1]])
+            """
 
             # revert bases if necessary
             for qubit_idx in range(n_qubits):
@@ -1236,8 +1335,10 @@ class Operator(object):
                             qc.u3(-pi / 2, -pi / 2, pi / 2, state_registers[qubit_idx])
                         else:
                             qc.rx(-pi / 2, state_registers[qubit_idx])
+
         # repeat the slice
         qc.data *= num_time_slices
+
         return qc
 
     @staticmethod
