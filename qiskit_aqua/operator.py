@@ -1274,9 +1274,6 @@ class Operator(object):
                 for Z_ctrl in Z_indices[:-1]:
                     qc.cx(state_registers[Z_ctrl], ancillary_registers[ctl_idx])
             
-                if Z_indices[-1] != top_XYZ_pauli_indices[pauli_idx]:
-                    qc.cx(state_registers[Z_indices[-1]],  ancillary_registers[top_XYZ_pauli_indices[pauli_idx]])
-
                 qc.cx(ancillary_registers[ctl_idx], state_registers[top_XYZ_pauli_indices[pauli_idx]])
                     
                 if inner_cnot_qubit_pairs[pauli_idx] is None:
@@ -1307,9 +1304,6 @@ class Operator(object):
                     qc.cx(state_registers[pair[0]], state_registers[pair[1]])
 
                 qc.cx(ancillary_registers[ctl_idx], state_registers[top_XYZ_pauli_indices[pauli_idx]])
-
-                if Z_indices[-1] != top_XYZ_pauli_indices[pauli_idx]:
-                    qc.cx(state_registers[Z_indices[-1]],  ancillary_registers[top_XYZ_pauli_indices[pauli_idx]])
 
                 for Z_ctrl in reversed(Z_indices[:-1]):
                     qc.cx(state_registers[Z_ctrl], ancillary_registers[ctl_idx])
